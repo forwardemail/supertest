@@ -1441,3 +1441,29 @@ describeHttp2('http2', function() {
     });
   });
 });
+
+describe('array should not be flatten', function () {
+  it('array destroyed', function (done) {
+    const app = express();
+
+    app.use(bodyParser.urlencoded({
+      extended: true
+    }));
+
+    app.post('/', function (req, res) {
+      res.status(200)
+        .json({ val: req.body.val });
+    });
+    request(app)
+      .post('/')
+      .set('Accept', 'application/json')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send({ val: [123] })
+      .expect(200)
+      .end(function (err, res) {
+        if (err) return done(err);
+        res.body.val.should.eql(['123']);
+        done();
+      });
+  });
+});
