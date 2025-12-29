@@ -12,6 +12,7 @@ try {
 }
 const Test = require('./lib/test.js');
 const agent = require('./lib/agent.js');
+const cookies = require('./lib/cookies');
 
 /**
  * Test against the given `app`,
@@ -59,3 +60,8 @@ module.exports.Test = Test;
  * Expose the agent function
  */
 module.exports.agent = agent;
+
+/**
+ * Expose cookie assertions
+ */
+module.exports.cookies = cookies;
