@@ -9,7 +9,7 @@ const should = require('should');
 const sinon = require('sinon');
 
 const cookies = request.cookies;
-const Assertion = require('../lib/cookies/Assertion');
+const Assertion = require('../lib/cookies/assertion');
 
 const secrets = ['one', 'a', 'two', 'b'];
 
