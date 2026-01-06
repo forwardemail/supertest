@@ -1,7 +1,7 @@
 {
   "name": "supertest",
   "description": "SuperAgent driven library for testing HTTP servers",
-  "version": "7.2.1",
+  "version": "7.2.2",
   "author": "TJ Holowaychuk",
   "contributors": [],
   "dependencies": {
