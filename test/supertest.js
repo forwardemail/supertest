@@ -774,6 +774,21 @@ describe('request(app)', function () {
         });
     });
 
+    it('should not be affected by content-type params that shadow header property', function(done) {
+      const app = express();
+
+      app.get('/', function (req, res) {
+        res.setHeader('foo', 'a');
+        res.setHeader('content-type', 'text/csv; header=present');
+        res.end();
+      });
+
+      request(app)
+        .get('/')
+        .expect('foo', 'a')
+        .end(done);
+    });
+
     describe('handling arbitrary expect functions', function () {
       let app;
       let get;
