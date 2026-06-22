@@ -119,4 +119,23 @@ describe('GitHub Issue Fixes', function() {
         });
     });
   });
+
+  describe('Issue #876: "header=" content-type param breaks header matchers', function() {
+    it('should match other headers when content-type has a "header=" parameter', function(done) {
+      const csvApp = express();
+      csvApp.get('/csv', function(req, res) {
+        // `header=present` is a valid text/csv parameter (RFC 7111). superagent
+        // copies content-type params onto the response, clobbering `res.header`.
+        res.setHeader('Content-Type', 'text/csv; header=present');
+        res.setHeader('X-Custom', 'value');
+        res.send('a,b,c');
+      });
+
+      supertest(csvApp)
+        .get('/csv')
+        .expect('X-Custom', 'value')
+        .expect(200)
+        .end(done);
+    });
+  });
 });
