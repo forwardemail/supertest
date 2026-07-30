@@ -1,5 +1,6 @@
 'use strict';
 
+const http = require('http');
 const https = require('https');
 let http2;
 try {
@@ -1455,6 +1456,109 @@ describeHttp2('http2', function() {
           mockApi(app, { http2: true });
         }).should.throw('supertest: this version of Node.js does not support http2');
       });
+    });
+  });
+});
+
+describe('concurrent requests', function () {
+  describe('request(server) sharing one ephemeral server', function () {
+    it('should serve requests racing on the same server (#726)', function () {
+      const server = http.createServer(function (req, res) {
+        if (req.url === '/slow') {
+          setTimeout(function () {
+            res.end('slow');
+          }, 50);
+          return;
+        }
+        res.end('fast');
+      });
+
+      const fast = request(server).get('/fast');
+      const slow = request(server).get('/slow');
+
+      return global.Promise.all([fast, slow]).then(function (responses) {
+        responses[0].text.should.equal('fast');
+        responses[1].text.should.equal('slow');
+        // the last in-flight request closed the server
+        server.listening.should.be.false();
+      });
+    });
+  });
+
+  describe('.concurrently(n, build)', function () {
+    it('should run n requests genuinely in parallel against one server', function () {
+      const waiting = [];
+      const app = function (req, res) {
+        waiting.push(res);
+        // Respond only once every request has arrived: this deadlocks (and
+        // times out the test) unless the requests are truly concurrent.
+        if (waiting.length === 2) {
+          waiting.forEach(function (pending) {
+            pending.end('raced');
+          });
+        }
+      };
+
+      return request(app)
+        .concurrently(2, function (r, i) {
+          return r.get('/race').set('x-index', String(i));
+        })
+        .then(function (responses) {
+          responses.length.should.equal(2);
+          responses[0].text.should.equal('raced');
+          responses[1].text.should.equal('raced');
+        });
+    });
+
+    it('should support per-request assertions', function () {
+      const app = function (req, res) {
+        res.end(req.url);
+      };
+
+      return request(app)
+        .concurrently(2, function (r, i) {
+          return r.get('/' + i).expect(200).expect('/' + i);
+        })
+        .then(function (responses) {
+          responses[0].text.should.equal('/0');
+          responses[1].text.should.equal('/1');
+        });
+    });
+
+    it('should leave a server the user started running', function () {
+      const server = http.createServer(function (req, res) {
+        res.end('ok');
+      });
+
+      return new global.Promise(function (resolve) {
+        server.listen(0, resolve);
+      })
+        .then(function () {
+          return request(server).concurrently(2, function (r) {
+            return r.get('/');
+          });
+        })
+        .then(function (responses) {
+          responses.length.should.equal(2);
+          server.listening.should.be.true();
+          return new global.Promise(function (resolve) {
+            server.close(resolve);
+          });
+        });
+    });
+
+    it('should reject n lower than 2', function () {
+      (function () {
+        request(function (req, res) { res.end(); }).concurrently(1, function (r) {
+          return r.get('/');
+        });
+      }).should.throw('.concurrently(n, build) expects n to be an integer >= 2, got 1');
+    });
+
+    it('should reject a non-function build', function () {
+      (function () {
+        request(function (req, res) { res.end(); }).concurrently(2, 'nope');
+      }).should.throw('.concurrently(n, build) expects build to be a function, got string');
     });
   });
 });

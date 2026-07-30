@@ -319,6 +319,27 @@ function hasPreviousAndNextKeys(res) {
 
 Perform the request and invoke `fn(err, res)`.
 
+### .concurrently(n, build)
+
+Run `n` requests concurrently against a single shared server — useful for
+testing race conditions and idempotency. `build` is called `n` times with a
+request instance bound to that server and the request index, and the returned
+promise resolves with the responses in build order:
+
+```js
+const [res1, res2] = await request(app)
+  .concurrently(2, (r, i) => r.post('/payments').send({ amount: 10 }));
+
+// exactly one of the two should have won
+[res1.status, res2.status].sort().should.eql([200, 409]);
+```
+
+Requests built by hand and awaited together also share the server:
+
+```js
+await Promise.all([request(server).get('/a'), request(server).get('/b')]);
+```
+
 ## Cookies
 
 Here is an example of using the `set` and `not` cookie assertions:
