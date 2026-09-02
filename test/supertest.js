@@ -20,7 +20,7 @@ const throwError = require('./throwError');
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 function shouldIncludeStackWithThisFile(err) {
-  err.stack.should.match(/test\/supertest.js:/);
+  err.stack.should.match(/test[/\\]supertest\.js:/);
   err.stack.should.startWith(err.name + ':');
 }
 
@@ -772,6 +772,22 @@ describe('request(app)', function () {
           shouldIncludeStackWithThisFile(err);
           done();
         });
+    });
+
+    it('should assert headers when content-type has header= parameter', function (done) {
+      const app = express();
+
+      app.get('/', function (req, res) {
+        res.setHeader('foo', 'bar');
+        res.setHeader('content-type', 'text/csv; header=present');
+        res.end('a,b,c\n1,2,3');
+      });
+
+      request(app)
+        .get('/')
+        .expect('foo', 'bar')
+        .expect('content-type', 'text/csv; header=present')
+        .expect(200, done);
     });
 
     describe('handling arbitrary expect functions', function () {

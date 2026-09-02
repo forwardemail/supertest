@@ -119,4 +119,66 @@ describe('GitHub Issue Fixes', function() {
         });
     });
   });
+
+  describe('Issue #876: content-type with header= parameter', function() {
+    beforeEach(function() {
+      app.get('/csv', function(req, res) {
+        res.setHeader('foo', 'bar');
+        res.setHeader('x-custom-header', 'custom-value');
+        res.setHeader('content-type', 'text/csv; header=present');
+        res.end('col1,col2\nval1,val2');
+      });
+    });
+
+    it('should not break header matchers when content-type has header=present', function(done) {
+      supertest(app)
+        .get('/csv')
+        .expect(200)
+        .expect('foo', 'bar')
+        .expect('x-custom-header', 'custom-value')
+        .expect('content-type', 'text/csv; header=present')
+        .end(done);
+    });
+
+    it('should support case-insensitive matching with header= present', function(done) {
+      supertest(app)
+        .get('/csv')
+        .expect(200)
+        .expect('Foo', 'bar')
+        .expect('X-Custom-Header', 'custom-value')
+        .expect('Content-Type', 'text/csv; header=present')
+        .end(done);
+    });
+
+    it('should support regex matching for headers with header= present', function(done) {
+      supertest(app)
+        .get('/csv')
+        .expect(200)
+        .expect('foo', /^bar$/)
+        .expect('content-type', /header=present/)
+        .end(done);
+    });
+
+    it('should properly fail when header expectation is not met', function(done) {
+      supertest(app)
+        .get('/csv')
+        .expect('foo', 'wrong-value')
+        .end(function(err) {
+          err.should.be.an.Error();
+          err.message.should.equal('expected "foo" of "wrong-value", got "bar"');
+          done();
+        });
+    });
+
+    it('should properly fail when header field is missing', function(done) {
+      supertest(app)
+        .get('/csv')
+        .expect('non-existent', 'value')
+        .end(function(err) {
+          err.should.be.an.Error();
+          err.message.should.equal('expected "non-existent" header field');
+          done();
+        });
+    });
+  });
 });
