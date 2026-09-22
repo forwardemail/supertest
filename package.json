@@ -18,7 +18,7 @@
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-import": "^2.27.5",
     "express": "^4.18.3",
-    "mocha": "^10.2.0",
+    "mocha": "^12.0.2",
     "nock": "^13.3.8",
     "nyc": "^15.1.0",
     "proxyquire": "^2.1.3",
