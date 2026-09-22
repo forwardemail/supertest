@@ -162,4 +162,41 @@ describe('GitHub Issue Fixes', function() {
       });
     });
   });
+
+  describe('Issue #891: request timeout startup timing', function() {
+    it('dispatches after the ephemeral server emits listening', function(done) {
+      let listening = false;
+      const server = http.createServer(function(req, res) {
+        listening.should.be.true;
+        res.end();
+      });
+
+      server.once('listening', function() {
+        listening = true;
+      });
+
+      supertest(server)
+        .get('/')
+        .expect(200)
+        .end(done);
+    });
+  });
+
+  describe('Issue #876: content-type header parameter', function() {
+    it('does not overwrite unrelated header matchers', function(done) {
+      const csvApp = express();
+      csvApp.get('/csv', function(req, res) {
+        res.setHeader('Content-Type', 'text/csv; header=present');
+        res.setHeader('X-Custom', 'value');
+        res.send('a,b,c');
+      });
+
+      supertest(csvApp)
+        .get('/csv')
+        .expect('Content-Type', /text\/csv/)
+        .expect('X-Custom', 'value')
+        .expect(200)
+        .end(done);
+    });
+  });
 });

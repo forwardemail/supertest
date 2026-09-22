@@ -4,6 +4,7 @@
  * Module dependencies.
  */
 const methods = require('methods');
+const http = require('http');
 let http2;
 try {
   http2 = require('http2'); // eslint-disable-line global-require
@@ -24,6 +25,7 @@ const cookies = require('./lib/cookies');
  */
 module.exports = function(app, options = {}) {
   const obj = {};
+  let target = app;
 
   if (typeof app === 'function') {
     if (options.http2) {
@@ -32,12 +34,15 @@ module.exports = function(app, options = {}) {
           'supertest: this version of Node.js does not support http2'
         );
       }
+      target = http2.createServer(app);
+    } else {
+      target = http.createServer(app);
     }
   }
 
   methods.forEach(function(method) {
     obj[method] = function(url) {
-      var test = new Test(app, method, url, options.http2);
+      var test = new Test(target, method, url, options.http2);
       if (options.http2) {
         test.http2();
       }

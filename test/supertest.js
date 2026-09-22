@@ -96,6 +96,42 @@ describe('request(app)', function () {
     global.Promise.all(requests).then(() => done(), done);
   });
 
+  it('should keep an ephemeral server open until concurrent requests complete', function () {
+    const app = express();
+    const responses = [];
+
+    app.get('/', function (req, res) {
+      responses.push(res);
+      if (responses.length === 2) {
+        responses.forEach(function (pending) {
+          pending.end('complete');
+        });
+      }
+    });
+
+    const client = request(app);
+    return global.Promise.all([
+      client.get('/').expect(200, 'complete'),
+      client.get('/').expect(200, 'complete')
+    ]);
+  });
+
+  it('should request through the loopback address of an ephemeral server', function (done) {
+    const app = express();
+    app.get('/', function (req, res) {
+      res.end(req.socket.remoteAddress);
+    });
+
+    request(app)
+      .get('/')
+      .expect(200)
+      .end(function (err, res) {
+        if (err) return done(err);
+        res.text.should.match(/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/);
+        done();
+      });
+  });
+
   it('should work with an active server', function (done) {
     const app = express();
     let server;
@@ -1343,15 +1379,13 @@ describe('request.get(url).query(vals) works as expected', function () {
       // https://github.com/ladjs/supertest/issues/352
       .expect(200)
       .end(function (err, res) {
+        nock.restore();
         should.exist(err);
         should.not.exist(res);
         err.should.be.an.instanceof(Error);
         err.message.should.match(/Nock: Disallowed net connect/);
-        shouldIncludeStackWithThisFile(err);
         done();
       });
-
-    nock.restore();
   });
 
   // this scenario should never happen

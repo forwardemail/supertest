@@ -130,6 +130,25 @@ describe('cookie', function () {
         .end(done);
     });
 
+    it('preserves cookie-name case while normalizing option names', function (done) {
+      const app = express();
+
+      app.get('/', function (req, res) {
+        res.set('Set-Cookie', 'Alpha=one; Path=/; HttpOnly');
+        res.send();
+      });
+
+      request(app)
+        .get('/')
+        .expect(cookies.set({ name: 'Alpha', options: ['path', 'httponly'] }))
+        .expect(function (res) {
+          should(function () {
+            cookies.set({ name: 'alpha' })(res);
+          }).throw('expected: alpha cookie to be set');
+        })
+        .end(done);
+    });
+
     it('asserts false if unsigned cookie is set but option was NOT set', function (done) {
       const app = express();
 
