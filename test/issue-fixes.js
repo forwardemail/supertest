@@ -161,6 +161,18 @@ describe('GitHub Issue Fixes', function() {
           .expect(200, 'supertest-server');
       });
     });
+
+    it('should bind the ephemeral server to the address it connects to', function() {
+      // A wildcard bind can share its port with another process's 127.0.0.1
+      // listener on macOS, and the client connection would reach that process.
+      const server = http.createServer(function(req, res) {
+        res.end(server.address().address);
+      });
+
+      return supertest(server)
+        .get('/')
+        .expect(200, '127.0.0.1');
+    });
   });
 
   describe('Issue #891: request timeout startup timing', function() {
