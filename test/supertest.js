@@ -1,5 +1,6 @@
 'use strict';
 
+const http = require('http');
 const https = require('https');
 let http2;
 try {
@@ -1011,6 +1012,57 @@ describe('request(app)', function () {
             shouldIncludeStackWithThisFile(err);
             done();
           });
+      });
+    });
+  });
+});
+
+describe('shared server late dispatch', function () {
+  function createServer() {
+    return http.createServer(function (req, res) {
+      res.end(req.headers.cookie || '');
+    });
+  }
+
+  const clients = [
+    {
+      name: 'request(server)',
+      create: function (server) { return request(server); }
+    },
+    {
+      name: 'request.agent(server)',
+      create: function (server) { return request.agent(server); }
+    }
+  ];
+
+  clients.forEach(function (client) {
+    // Outer Test is built first. The awaited inner request is the only one
+    // that reaches end(), so it closes the shared server before the outer send.
+    it(client.name + ' should send a request built before another finishes', function () {
+      const server = createServer();
+      const api = client.create(server);
+      const account = api.get('/account');
+
+      return api.post('/login').expect(200).then(function () {
+        server.listening.should.equal(false);
+        return account.set('Cookie', 'session=1').expect(200, 'session=1');
+      });
+    });
+
+    // Same gap, but the outer Test is built only after listen() has resolved,
+    // so its URL already contains the port that the inner request then closes.
+    it(client.name + ' should retarget a request built while the server is listening', function () {
+      const server = createServer();
+      const api = client.create(server);
+      const held = api.get('/hold');
+
+      return new global.Promise(function (resolve, reject) {
+        server.once('listening', function () {
+          const account = api.get('/account');
+          held.expect(200).then(function () {
+            return account.set('Cookie', 'session=1').expect(200, 'session=1');
+          }).then(resolve, reject);
+        });
       });
     });
   });
