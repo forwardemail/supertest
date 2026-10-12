@@ -297,7 +297,7 @@ parsed body object.
 
 ### .expect(field, value[, fn])
 
-Assert header `field` `value` with a string or regular expression.
+Assert header `field` `value` with a string, number, or regular expression.
 
 ### .expect(function(res) {})
 

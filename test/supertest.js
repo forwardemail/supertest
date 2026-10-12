@@ -793,6 +793,43 @@ describe('request(app)', function () {
         });
     });
 
+    [
+      ['Content-Length', '3', 3],
+      ['X-Number', '0', 0],
+      ['X-Number', '-1', -1],
+      ['X-Number', '1.5', 1.5]
+    ].forEach(([header, actual, expected]) => {
+      it('should match the numeric header value ' + expected, function (done) {
+        const app = express();
+
+        app.get('/', function (req, res) {
+          res.set(header, actual);
+          res.send('hey');
+        });
+
+        request(app)
+          .get('/')
+          .expect(header, expected, done);
+      });
+    });
+
+    it('should not match a different string representation of a numeric header', function (done) {
+      const app = express();
+
+      app.get('/', function (req, res) {
+        res.set('X-Number', '03');
+        res.send('hey');
+      });
+
+      request(app)
+        .get('/')
+        .expect('X-Number', 3)
+        .end(function (err) {
+          err.message.should.equal('expected "X-Number" of "3", got "03"');
+          done();
+        });
+    });
+
     it('should support numbers', function (done) {
       const app = express();
 
