@@ -211,4 +211,20 @@ describe('GitHub Issue Fixes', function() {
         .end(done);
     });
   });
+
+  describe('Issue #911: streaming requests with .write against an app factory', function() {
+    it('should connect to ephemeral server port when using write', function(done) {
+      const streamApp = express();
+      streamApp.use(express.text());
+      streamApp.post('/stream', function(req, res) {
+        res.send('echo: ' + req.body);
+      });
+
+      const test = supertest(streamApp).post('/stream');
+      test.set('Content-Type', 'text/plain');
+      test.write('hello ');
+      test.write('world');
+      test.expect(200, 'echo: hello world', done);
+    });
+  });
 });
