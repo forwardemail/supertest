@@ -1,6 +1,7 @@
 'use strict';
 
 const http = require('http');
+const { Writable } = require('stream');
 const supertest = require('../index.js');
 const express = require('express');
 
@@ -191,6 +192,29 @@ describe('GitHub Issue Fixes', function() {
         .get('/')
         .expect(200)
         .end(done);
+    });
+  });
+
+  describe('Issue #917: pipe from an ephemeral server', function() {
+    it('does not throw and writes the response body', function(done) {
+      const server = http.createServer(function(req, res) {
+        res.end('ok');
+      });
+      const chunks = [];
+      const dest = new Writable({
+        write(chunk, encoding, callback) {
+          chunks.push(chunk);
+          callback();
+        }
+      });
+
+      dest.on('finish', function() {
+        Buffer.concat(chunks).toString().should.equal('ok');
+        done();
+      });
+      dest.on('error', done);
+
+      supertest(server).get('/data').pipe(dest);
     });
   });
 
