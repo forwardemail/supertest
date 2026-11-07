@@ -68,6 +68,13 @@ describe('cookie', function () {
       });
   });
 
+  it('keeps a cookie value that is not valid percent-encoding as is', function () {
+    const cookie = Assertion().parse('substance=100%; Path=/');
+    cookie.name.should.equal('substance');
+    cookie.value.should.equal('100%');
+    cookie.options.should.eql({ path: '/' });
+  });
+
   describe('.set', function () {
     it('asserts true if signed cookie is set and options are set', function (done) {
       const app = express();

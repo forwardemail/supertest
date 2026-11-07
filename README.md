@@ -28,7 +28,9 @@ npm install supertest --save-dev
 
 You may pass an `http.Server`, or a `Function` to `request()` - if the server is not
 already listening for connections then it is bound to an ephemeral port for you so
-there is no need to keep track of ports.
+there is no need to keep track of ports. Requests made from the same app share that
+server, which closes once the last request sent to it finishes and starts again for
+the next one.
 
 supertest works with any test framework, here is an example without using any
 test framework at all:
@@ -297,7 +299,7 @@ parsed body object.
 
 ### .expect(field, value[, fn])
 
-Assert header `field` `value` with a string or regular expression.
+Assert header `field` `value` with a string, number, or regular expression.
 
 ### .expect(function(res) {})
 

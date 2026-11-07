@@ -1,6 +1,8 @@
 'use strict';
 
 const http = require('http');
+const { Writable } = require('stream');
+const should = require('should');
 const supertest = require('../index.js');
 const express = require('express');
 
@@ -209,6 +211,151 @@ describe('GitHub Issue Fixes', function() {
         .expect('X-Custom', 'value')
         .expect(200)
         .end(done);
+    });
+  });
+
+  describe('Issue #909: request built before another request finishes', function() {
+    function cookieServer() {
+      return http.createServer(function(req, res) {
+        res.end(req.headers.cookie || '');
+      });
+    }
+
+    it('restarts the shared server the other request closed', function() {
+      const server = cookieServer();
+      const account = supertest(server).get('/account');
+
+      return supertest(server)
+        .post('/login')
+        .expect(200)
+        .then(function() {
+          server.listening.should.be.false();
+          return account.set('Cookie', 'session=1').expect(200, 'session=1');
+        })
+        .then(function() {
+          server.listening.should.be.false();
+        });
+    });
+
+    it('waits for a shared server that is still closing', function() {
+      const server = cookieServer();
+      const close = server.close;
+      let reopened;
+
+      // Send another request from inside the close that ends the first one.
+      server.close = function(callback) {
+        server.close = close;
+        reopened = supertest(server).get('/again').set('Cookie', 'again=1').expect(200, 'again=1');
+        return close.call(server, callback);
+      };
+
+      return supertest(server)
+        .get('/')
+        .expect(200)
+        .then(function() {
+          return reopened;
+        })
+        .then(function() {
+          server.listening.should.be.false();
+        });
+    });
+
+    it('leaves a server the caller starts before sending alone', function(done) {
+      const server = cookieServer();
+      const test = supertest(server).get('/').set('Cookie', 'own=1');
+
+      server.listen(0, '127.0.0.1', function() {
+        test.expect(200, 'own=1', function(err) {
+          if (err) return done(err);
+          server.listening.should.be.true();
+          server.close(done);
+        });
+      });
+    });
+
+    it('adds no listener per request while the shared server starts', function() {
+      const client = supertest(app);
+      const tests = [];
+      for (let i = 0; i < 20; i += 1) tests.push(client.get('/').expect(200, { ok: true }));
+      const server = tests[0]._server;
+      const listening = server.listenerCount('listening');
+      const errors = server.listenerCount('error');
+
+      const pending = global.Promise.all(tests.map(function (test) {
+        return test.then();
+      }));
+      server.listenerCount('listening').should.equal(listening + 1);
+      server.listenerCount('error').should.equal(errors + 1);
+      return pending;
+    });
+  });
+
+  describe('Issue #911: write() against a server SuperTest starts', function() {
+    let streamApp;
+
+    beforeEach(function() {
+      streamApp = express();
+      streamApp.post('/', express.text(), function(req, res) {
+        res.send('echo: ' + req.body);
+      });
+    });
+
+    it('sends what was written before the server was listening', function(done) {
+      const test = supertest(streamApp).post('/').set('Content-Type', 'text/plain');
+      test.write('hello ').should.be.true();
+      test.write('world');
+      test.expect(200, 'echo: hello world', done);
+    });
+
+    it('keeps streaming writes made once the server is listening', function(done) {
+      const test = supertest(streamApp).post('/').set('Content-Type', 'text/plain');
+      test.write('hello ');
+      test._server.once('listening', function() {
+        setImmediate(function() {
+          test.write('world');
+          test.expect(200, 'echo: hello world', done);
+        });
+      });
+    });
+
+    it('reports a chunk the request cannot write and still closes the server', function(done) {
+      const test = supertest(streamApp).post('/');
+      const server = test._server;
+      test.write({ not: 'a chunk' });
+      test.end(function(err) {
+        should.exist(err);
+        err.code.should.equal('ERR_INVALID_ARG_TYPE');
+        server.listening.should.be.false();
+        done();
+      });
+    });
+  });
+
+  describe('pipe() from a server SuperTest starts', function() {
+    it('pipes the response and then closes the server', function(done) {
+      const server = http.createServer(function(req, res) {
+        res.end('piped');
+      });
+      const chunks = [];
+      let pending = 2;
+      function next() {
+        pending -= 1;
+        if (pending === 0) {
+          Buffer.concat(chunks).toString().should.equal('piped');
+          done();
+        }
+      }
+      const dest = new Writable({
+        write: function(chunk, encoding, callback) {
+          chunks.push(chunk);
+          callback();
+        }
+      });
+
+      dest.on('finish', next);
+      dest.on('error', done);
+      server.once('close', next);
+      supertest(server).get('/').pipe(dest).should.equal(dest);
     });
   });
 });

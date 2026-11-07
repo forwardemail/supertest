@@ -810,6 +810,43 @@ describe('request(app)', function () {
         });
     });
 
+    [
+      ['Content-Length', '3', 3],
+      ['X-Number', '0', 0],
+      ['X-Number', '-1', -1],
+      ['X-Number', '1.5', 1.5]
+    ].forEach(function (testCase) {
+      it('should match the numeric header value ' + testCase[2], function (done) {
+        const app = express();
+
+        app.get('/', function (req, res) {
+          res.set(testCase[0], testCase[1]);
+          res.send('hey');
+        });
+
+        request(app)
+          .get('/')
+          .expect(testCase[0], testCase[2], done);
+      });
+    });
+
+    it('should not match a different string form of a numeric header', function (done) {
+      const app = express();
+
+      app.get('/', function (req, res) {
+        res.set('X-Number', '03');
+        res.send('hey');
+      });
+
+      request(app)
+        .get('/')
+        .expect('X-Number', 3)
+        .end(function (err) {
+          err.message.should.equal('expected "X-Number" of "3", got "03"');
+          done();
+        });
+    });
+
     describe('handling arbitrary expect functions', function () {
       let app;
       let get;
