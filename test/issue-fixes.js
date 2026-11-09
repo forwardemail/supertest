@@ -331,6 +331,49 @@ describe('GitHub Issue Fixes', function() {
     });
   });
 
+  describe('request() before a server SuperTest starts is listening', function() {
+    it('throws instead of building a request for port 80', function(done) {
+      const test = supertest(app).get('/');
+      (function() {
+        test.request();
+      }).should.throw(/before the server SuperTest started was listening/);
+      should.not.exist(test.req);
+      test.expect(200, { ok: true }, function(err) {
+        if (err) return done(err);
+        test._server.listening.should.be.false();
+        done();
+      });
+    });
+
+    it('exposes the request with its port through the request event', function(done) {
+      const test = supertest(app).get('/');
+      let host;
+      test.on('request', function() {
+        host = test.req.getHeader('host');
+      });
+      test.expect(200, function(err) {
+        if (err) return done(err);
+        host.should.match(/^127\.0\.0\.1:\d+$/);
+        test.request().should.equal(test.req);
+        done();
+      });
+    });
+
+    it('still returns the request for a server the caller started', function(done) {
+      const server = http.createServer(function(req, res) {
+        res.end('ok');
+      });
+      server.listen(0, '127.0.0.1', function() {
+        const test = supertest(server).get('/');
+        test.request().getHeader('host').should.equal('127.0.0.1:' + server.address().port);
+        test.expect(200, 'ok', function(err) {
+          server.close();
+          done(err);
+        });
+      });
+    });
+  });
+
   describe('pipe() from a server SuperTest starts', function() {
     it('pipes the response and then closes the server', function(done) {
       const server = http.createServer(function(req, res) {
